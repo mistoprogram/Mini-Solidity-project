@@ -1,7 +1,9 @@
 # Compiler files
 cache/
 out/
-
+lib/
+foundry.lock
+foundry.toml
 # Ignores development broadcast logs
 !/broadcast
 /broadcast/*/31337/
