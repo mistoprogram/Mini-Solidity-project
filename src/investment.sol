@@ -88,7 +88,7 @@ contract investmentPool {
 
         investors.push(newInvestor);
         investorByAddress[msg.sender] = newInvestor;
-        investorByPoolId[_poolId].puhs(newInvestor);
+        investorByPoolId[_poolId].push(newInvestor);
 
         emit investmentMade(_poolId, msg.sender, _amount, ownershipBps);
     }
@@ -97,7 +97,7 @@ contract investmentPool {
         return poolById[_poolId];
     }
 
-    function getInvestors(uint _poolId) public view returns(investor[]) {
+    function getInvestors(uint _poolId) public view returns(investor[] memory) {
         return investorByPoolId[_poolId];
     }
 
