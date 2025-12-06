@@ -16,6 +16,7 @@ contract InvestmentPool {
         uint timestamp;
         uint ownershipPercent;
         bool hasWithdrawn;
+        uint payoutAmount;
     }
 
     struct Pool {
@@ -26,7 +27,8 @@ contract InvestmentPool {
         uint deadline;
         string status;
         uint totalReturnReceived;
-        uint totalProfit;
+        int totalProfit;
+        uint payoutAmount;
     }
 
     //==================== STATE VARIABLES ====================
@@ -198,11 +200,19 @@ contract InvestmentPool {
     {
         Pool storage pool = pools[_poolId];
         require(
+            block.timestamp > pool.deadline, "Deadline has not yet passed"
+        );
+        
+        require(
             keccak256(abi.encodePacked(pool.status)) == keccak256(abi.encodePacked("open")),
             "Pool is already closed"
         );
         
         pool.status = "closed";
         emit poolStatusChanged(_poolId, "closed");
+    }
+    
+    function receiveReturn(uint _poolId, uint _returnAmount) public {
+        
     }
 }
