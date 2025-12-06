@@ -4,6 +4,8 @@ out/
 lib/
 foundry.lock
 foundry.toml
+.github/
+
 # Ignores development broadcast logs
 !/broadcast
 /broadcast/*/31337/

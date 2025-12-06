@@ -60,7 +60,7 @@ contract investmentPool {
             deadline: deadlineTime
         });
 
-        poolById[newPool] = newPool;
+        poolById[poolId] = newPool;
 
         emit poolCreated(poolId, msg.sender, _targetAmount, _deadline);
 
@@ -69,7 +69,7 @@ contract investmentPool {
 
     function investIn(uint _poolId, uint _amount) public payable {
         pool memory selectPool = poolById[_poolId];
-        require(keccak256(abi.encodePacked(selectPool.poolStatus)) == keccak256(abi.encodePacked("open"), "pool isn't open for investment"));
+        require(keccak256(abi.encodePacked(selectPool.poolStatus)) == keccak256(abi.encodePacked("open")), "pool isn't open for investment");
         require(block.timestamp <= selectPool.deadline);
         require(_amount > 0, "investment amount must be greater than 0");
         require(msg.value >= _amount, "amount sent");
@@ -84,24 +84,24 @@ contract investmentPool {
             timeStamp : block.timestamp,
             percent : ownershipBps,
             withdraw : false
-        })
+        });
 
         investors.push(newInvestor);
         investorByAddress[msg.sender] = newInvestor;
-        investorByPoolId[_poolId] = newInvestor;
+        investorByPoolId[_poolId].puhs(newInvestor);
 
         emit investmentMade(_poolId, msg.sender, _amount, ownershipBps);
     }
 
-    function getPoolDetail(uint _poolId) public {
+    function getPoolDetail(uint _poolId) public view returns(pool memory) {
         return poolById[_poolId];
     }
 
-    function getInvestors(uint _poolId) public returns(investors) {
+    function getInvestors(uint _poolId) public view returns(investor[]) {
         return investorByPoolId[_poolId];
     }
 
-    function investorCount(uint _poolId) public returns(uint) {
-        return investorByPoolId[_poolId].length();
+    function investorCount(uint _poolId) public view returns(uint) {
+        return investorByPoolId[_poolId].length;
     }
 }
