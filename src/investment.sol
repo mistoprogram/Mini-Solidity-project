@@ -94,7 +94,8 @@ contract InvestmentPool {
             deadline: deadlineTime,
             status: "open",
             totalReturnReceived: 0,
-            totalProfit: 0
+            totalProfit: 0,
+            payoutAmount:0
         });
 
         pools.push(newPool);
@@ -136,7 +137,8 @@ contract InvestmentPool {
             amount: _amount,
             timestamp: block.timestamp,
             ownershipPercent: ownershipBps,
-            hasWithdrawn: false
+            hasWithdrawn: false,
+            payoutAmount:0
         });
 
         // Store investor
@@ -210,9 +212,5 @@ contract InvestmentPool {
         
         pool.status = "closed";
         emit poolStatusChanged(_poolId, "closed");
-    }
-    
-    function receiveReturn(uint _poolId, uint _returnAmount) public {
-        
     }
 }

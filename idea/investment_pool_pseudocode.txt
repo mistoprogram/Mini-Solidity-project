@@ -1,0 +1,323 @@
+// ============================================
+// INVESTMENT POOL - PSEUDOCODE
+// ============================================
+
+// DATA STRUCTURES
+// ============================================
+
+STRUCT Investor {
+    address walletAddress
+    uint amountInvested
+    uint timestampOfInvestment
+    float ownershipPercentage
+    bool hasWithdrawn
+}
+
+STRUCT InvestmentPool {
+    uint poolId
+    address poolOwner
+    uint targetAmount
+    uint currentAmountRaised
+    uint investmentDeadline
+    string poolStatus  // "open", "closed", "completed"
+    uint totalReturnsReceived
+    float totalProfit
+}
+
+// GLOBAL DATA
+// ============================================
+
+ARRAY<Investor> allInvestors
+MAPPING<address → Investor> investorByAddress
+MAPPING<uint → InvestmentPool> poolById
+MAPPING<uint → ARRAY<Investor>> investorsByPoolId
+
+uint poolCounter = 0  // To generate unique pool IDs
+
+
+// EVENTS
+// ============================================
+
+EVENT PoolCreated(uint poolId, address owner, uint targetAmount, uint deadline)
+EVENT InvestmentMade(uint poolId, address investor, uint amount, float ownershipPercentage)
+EVENT PoolClosed(uint poolId)
+EVENT ReturnsDistributed(uint poolId, uint totalProfit)
+EVENT WithdrawalProcessed(uint poolId, address investor, uint amountWithdrawn)
+
+
+// PHASE 1: POOL CREATION & INVESTMENT
+// ============================================
+
+FUNCTION createInvestmentPool(uint _targetAmount, uint _deadlineInDays) RETURNS uint {
+    
+    // Generate unique pool ID
+    uint newPoolId = poolCounter
+    poolCounter += 1
+    
+    // Calculate deadline timestamp
+    uint deadlineTimestamp = CURRENT_TIME + (_deadlineInDays * 86400)  // 86400 seconds in a day
+    
+    // Create new pool struct
+    InvestmentPool newPool = {
+        poolId: newPoolId,
+        poolOwner: CALLER_ADDRESS,
+        targetAmount: _targetAmount,
+        currentAmountRaised: 0,
+        investmentDeadline: deadlineTimestamp,
+        poolStatus: "open",
+        totalReturnsReceived: 0,
+        totalProfit: 0
+    }
+    
+    // Store pool
+    poolById[newPoolId] = newPool
+    
+    // Emit event
+    EMIT PoolCreated(newPoolId, CALLER_ADDRESS, _targetAmount, deadlineTimestamp)
+    
+    RETURN newPoolId
+}
+
+
+FUNCTION investInPool(uint _poolId, uint _amountToInvest) {
+    
+    // Get pool
+    InvestmentPool pool = poolById[_poolId]
+    
+    // Validation checks
+    REQUIRE pool.poolStatus == "open", "Pool is not open for investment"
+    REQUIRE CURRENT_TIME <= pool.investmentDeadline, "Investment deadline has passed"
+    REQUIRE _amountToInvest > 0, "Investment amount must be greater than 0"
+    
+    // Transfer funds from investor to contract
+    TRANSFER _amountToInvest from CALLER_ADDRESS to CONTRACT
+    
+    // Update pool's total raised
+    pool.currentAmountRaised += _amountToInvest
+    
+    // Calculate investor's ownership percentage
+    float ownershipPercent = (_amountToInvest / pool.currentAmountRaised) * 100
+    
+    // Create investor struct
+    Investor newInvestor = {
+        walletAddress: CALLER_ADDRESS,
+        amountInvested: _amountToInvest,
+        timestampOfInvestment: CURRENT_TIME,
+        ownershipPercentage: ownershipPercent,
+        hasWithdrawn: false
+    }
+    
+    // Store investor in arrays and mappings
+    allInvestors.push(newInvestor)
+    investorByAddress[CALLER_ADDRESS] = newInvestor
+    investorsByPoolId[_poolId].push(newInvestor)
+    
+    // Emit event
+    EMIT InvestmentMade(_poolId, CALLER_ADDRESS, _amountToInvest, ownershipPercent)
+}
+
+
+FUNCTION getPoolDetails(uint _poolId) RETURNS InvestmentPool {
+    RETURN poolById[_poolId]
+}
+
+
+FUNCTION getInvestorsInPool(uint _poolId) RETURNS ARRAY<Investor> {
+    RETURN investorsByPoolId[_poolId]
+}
+
+
+FUNCTION getInvestorCount(uint _poolId) RETURNS uint {
+    RETURN LENGTH OF investorsByPoolId[_poolId]
+}
+
+
+// PHASE 2: CLOSE POOL & DISTRIBUTE RETURNS
+// ============================================
+
+FUNCTION closePool(uint _poolId) {
+    
+    // Get pool
+    InvestmentPool pool = poolById[_poolId]
+    
+    // Validation
+    REQUIRE CURRENT_TIME > pool.investmentDeadline, "Deadline has not passed yet"
+    REQUIRE pool.poolStatus == "open", "Pool is already closed"
+    
+    // Update status
+    pool.poolStatus = "closed"
+    
+    // Emit event
+    EMIT PoolClosed(_poolId)
+}
+
+
+FUNCTION receiveReturns(uint _poolId, uint _returnAmount) {
+    
+    // Get pool
+    InvestmentPool pool = poolById[_poolId]
+    
+    // Validation
+    REQUIRE CALLER_ADDRESS == pool.poolOwner, "Only pool owner can receive returns"
+    REQUIRE pool.poolStatus == "closed", "Pool must be closed before receiving returns"
+    
+    // Transfer returns to contract
+    TRANSFER _returnAmount from CALLER_ADDRESS to CONTRACT
+    
+    // Store returns
+    pool.totalReturnsReceived = _returnAmount
+    
+    // Calculate profit/loss
+    uint originalInvestment = pool.currentAmountRaised
+    IF _returnAmount > originalInvestment THEN
+        pool.totalProfit = _returnAmount - originalInvestment  // Profit
+    ELSE
+        pool.totalProfit = _returnAmount - originalInvestment  // Loss (negative number)
+    END IF
+    
+    // Distribute returns to investors
+    distributeReturns(_poolId)
+    
+    // Update pool status
+    pool.poolStatus = "completed"
+}
+
+
+FUNCTION distributeReturns(uint _poolId) PRIVATE {
+    
+    // Get pool and all investors
+    InvestmentPool pool = poolById[_poolId]
+    ARRAY<Investor> investors = investorsByPoolId[_poolId]
+    
+    // Get total profit
+    uint totalProfit = pool.totalProfit
+    
+    // For each investor, calculate their payout
+    FOR EACH investor IN investors DO
+        
+        // Calculate their ownership percentage (fixed at time of investment)
+        float sharePercentage = investor.ownershipPercentage
+        
+        // Calculate their share of the profit
+        uint profitShare = (totalProfit * sharePercentage) / 100
+        
+        // Calculate total payout (original investment + profit share)
+        uint totalPayout = investor.amountInvested + profitShare
+        
+        // Store payout amount in investor record (for later withdrawal)
+        investor.payoutAmount = totalPayout
+        
+    END FOR
+    
+    // Emit event
+    EMIT ReturnsDistributed(_poolId, totalProfit)
+}
+
+
+// PHASE 3: WITHDRAWAL
+// ============================================
+
+FUNCTION withdrawFunds(uint _poolId) {
+    
+    // Get pool
+    InvestmentPool pool = poolById[_poolId]
+    
+    // Get investor
+    Investor investor = investorByAddress[CALLER_ADDRESS]
+    
+    // Validation checks
+    REQUIRE pool.poolStatus == "completed", "Pool returns have not been distributed yet"
+    REQUIRE investor.hasWithdrawn == false, "You have already withdrawn"
+    REQUIRE investor.payoutAmount > 0, "You have no funds to withdraw"
+    
+    // Get payout amount
+    uint payoutAmount = investor.payoutAmount
+    
+    // Mark as withdrawn
+    investor.hasWithdrawn = true
+    
+    // Transfer funds to investor
+    TRANSFER payoutAmount from CONTRACT to CALLER_ADDRESS
+    
+    // Emit event
+    EMIT WithdrawalProcessed(_poolId, CALLER_ADDRESS, payoutAmount)
+}
+
+
+// HELPER FUNCTIONS
+// ============================================
+
+FUNCTION getInvestorDetails(uint _poolId, address _investorAddress) RETURNS Investor {
+    RETURN investorByAddress[_investorAddress]
+}
+
+
+FUNCTION getTotalPooledAmount(uint _poolId) RETURNS uint {
+    InvestmentPool pool = poolById[_poolId]
+    RETURN pool.currentAmountRaised
+}
+
+
+FUNCTION getPoolStatus(uint _poolId) RETURNS string {
+    InvestmentPool pool = poolById[_poolId]
+    RETURN pool.poolStatus
+}
+
+
+FUNCTION hasDeadlinePassed(uint _poolId) RETURNS bool {
+    InvestmentPool pool = poolById[_poolId]
+    IF CURRENT_TIME > pool.investmentDeadline THEN
+        RETURN true
+    ELSE
+        RETURN false
+    END IF
+}
+
+
+FUNCTION getInvestorPayoutAmount(uint _poolId, address _investorAddress) RETURNS uint {
+    Investor investor = investorByAddress[_investorAddress]
+    RETURN investor.payoutAmount
+}
+
+
+FUNCTION getAllPools() RETURNS ARRAY<InvestmentPool> {
+    RETURN ALL POOLS IN poolById
+}
+
+
+// ============================================
+// EXAMPLE USAGE FLOW
+// ============================================
+
+// Step 1: Create pool
+poolId = createInvestmentPool(1000, 7)  // $1000 target, 7 day deadline
+// Result: poolId = 0, status = "open"
+
+// Step 2: Investors join
+investInPool(poolId, 400)   // Alice invests $400 (40% ownership)
+investInPool(poolId, 300)   // Bob invests $300 (42.8% ownership)
+investInPool(poolId, 300)   // Charlie invests $300 (42.8% ownership)
+// Total pooled: $1000
+
+// Step 3: Wait 7 days...
+// Deadline passes
+
+// Step 4: Close pool
+closePool(poolId)
+// Status = "closed"
+
+// Step 5: Owner executes investment and later gets returns
+// (in real scenario, this happens externally)
+
+// Step 6: Owner deposits returns into contract
+receiveReturns(poolId, 1250)  // Investment returned $1250 (profit = $250)
+// Automatically distributes:
+// - Alice: $400 + ($250 * 0.4) = $500
+// - Bob: $300 + ($250 * 0.428) = $406.86
+// - Charlie: $300 + ($250 * 0.428) = $406.86
+// Status = "completed"
+
+// Step 7: Investors withdraw
+withdrawFunds(poolId)  // Called by Alice, transfers $500 to her
+withdrawFunds(poolId)  // Called by Bob, transfers $406.86 to him
+withdrawFunds(poolId)  // Called by Charlie, transfers $406.86 to him
