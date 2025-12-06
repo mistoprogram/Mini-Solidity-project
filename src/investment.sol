@@ -74,11 +74,11 @@ contract InvestmentPool {
         locked = false;
     }
 
-    //==================== RECEIVE FUNCTIONS ====================
+    //make contract able to receive payment
     receive() external payable {}
     fallback() external payable {}
 
-    //==================== POOL MANAGEMENT ====================
+    //Pool section
     function createPool(uint _targetAmount, uint _deadline) public returns(uint) {
         require(_targetAmount > 0, "Target amount must be greater than 0");
         require(_deadline > 0, "Deadline must be in the future");
@@ -107,7 +107,7 @@ contract InvestmentPool {
         return poolId;
     }
 
-    //==================== INVESTMENT FUNCTIONS ====================
+    //Investment Function
     function investIn(uint _poolId, uint _amount) 
         public 
         payable 
