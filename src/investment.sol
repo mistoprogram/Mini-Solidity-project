@@ -251,12 +251,12 @@ contract InvestmentPool {
 
         investmentPool.totalReturnReceived = _returnAmount;
         uint originalInvestment = investmentPool.amountRaised;
-        uint256 returnUint = _returnAmount;
-        uint256 investmentUint = originalInvestment;
 
         if (_returnAmount > originalInvestment) {
-            investmentPool.totalProfit = int256(returnUint - investmentUint);;
+            // forge-lint: disable-next-line(unsafe-typecast)
+            investmentPool.totalProfit = int256(_returnAmount - originalInvestment);
         } else {
+            // forge-lint: disable-next-line(unsafe-typecast)
             investmentPool.totalProfit = int256(_returnAmount - originalInvestment);
         }
 
@@ -267,7 +267,6 @@ contract InvestmentPool {
 
     function _distributeR(uint _poolId) 
     private
-    returns(uint)
     {
         Pool storage pool = pools[_poolId];
         Investor[] storage investors = poolInvestors[_poolId];  // Use storage to modify
@@ -276,6 +275,7 @@ contract InvestmentPool {
     
         // Loop through each investor
         for(uint i = 0; i < investors.length; i++) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             uint profitShare = (uint(tProfit) * investors[i].ownershipPercent) / 10000;
             uint totalPayout = investors[i].amount + profitShare;
             
@@ -283,6 +283,5 @@ contract InvestmentPool {
             investors[i].payoutAmount = totalPayout;
         }
         emit returnDistributed(_poolId,tProfit);
-        return tProfit
     }
 }
