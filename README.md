@@ -27,10 +27,10 @@ A comprehensive smart contract system for managing decentralized investment pool
 mini-solidity-project/
 ├── src/
 │   └── InvestmentPool.sol          # Main smart contract
-├── docs/
-│   ├── Phase1-Documentation.md     # Core architecture & pool creation
-│   ├── Phase2-Documentation.md     # Return management & distribution
-│   └── Architecture.md              # System design overview
+├── day to day documentation/
+│   ├── day1.md     # day one progress, finished phase one
+│   ├── day2.md     # day two progess, finished phase two
+│   └── ongoing     # ongoing documentation
 ├── idea/
 │   └── [Full project specifications and design documents]
 ├── README.md                        # This file
