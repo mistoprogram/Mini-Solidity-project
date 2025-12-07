@@ -507,6 +507,7 @@ withdraw(poolId); // Investor B gets 75 ETH
 ran forge test for several times, the code passed 7/7 test.
 
 | Deployment cost| Deployment Size|
+|-------|-------|-----|----|---|----|
 | 3738841|17107| | | | |
 |-----|----|----|---|---|----|
 |Function name | Min | avg| median|max| calls|
