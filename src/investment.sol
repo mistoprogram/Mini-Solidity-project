@@ -8,7 +8,7 @@ contract InvestmentPool {
     event investmentMade(uint indexed poolId, address indexed investor, uint amount, uint ownershipPercent);
     event poolStatusChanged(uint indexed poolId, string newStatus);
     event withdrawalMade(uint indexed poolId, address indexed investor, uint amount);
-
+    event returnDistributed(uint indexed poolId, uint indexed totalProfit);
     //==================== STRUCTS ====================
     struct Investor {
         address investorAddress;
@@ -212,5 +212,43 @@ contract InvestmentPool {
         
         pool.status = "closed";
         emit poolStatusChanged(_poolId, "closed");
+    }
+
+    function receiveReturn(uint _poolId, uint _returnAmount)
+    public payable
+    onlyPoolOwner(_poolId);
+    {
+        Pool storage InvestmentPool = pools[_poolId];
+        validPoolId(_poolId);
+        validAmount(_returnAmount);
+
+        InvestmentPool.totalReturnReceived = _returnAmount;
+        uint originalInvestment = InvestmentPool.amountRaised;
+        if _returnAmount > originalInvestment {
+            InvestmentPool.totalProfit = _returnAmount - originalInvestmet;
+        } else {
+            InvestmentPool.totalProfit = _returnAmount - originalInvestmet;
+        };
+
+        _distributeR(_poolId);
+        InvestmentPool.status = "completed"
+    }
+
+    function _distributeR(uint _poolId) 
+    private
+    {
+        Pool storage pool = pools[_poolId];
+        investors[] memory AllInvestor = poolInvestors[_poolid];
+
+        tProfit = pool.totalProfit;
+
+        for(uint i=0; i < pool.length; i++) {
+            uint profitShare = (totalProfit * poolInvestors[i].ownershipPercent) / 10000;
+            uint tPayout = AllInvestor.amount + profitShare;
+
+            AllInvestor[_poolId][i].payoutAmount = tpayout;
+        }
+
+        emit returnDistributed(_poolId, tprofit);
     }
 }
