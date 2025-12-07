@@ -509,7 +509,6 @@ ran forge test for several times, the code passed 7/7 test.
 | Deployment cost| Deployment Size|
 |-------|-------|-----|----|---|----|
 | 3738841|17107| | | | |
-|-----|----|----|---|---|----|
 |Function name | Min | avg| median|max| calls|
 |closePool |  39388 | 39388|  39388| 39388|1|
 |createPool | 192564          | 192564 | 192564 | 192564 | 7|
