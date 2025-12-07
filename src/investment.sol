@@ -236,6 +236,7 @@ contract InvestmentPool {
 
     function _distributeR(uint _poolId) 
     private
+    returns(uint)
     {
         Pool storage pool = pools[_poolId];
         investors[] memory AllInvestor = poolInvestors[_poolid];
