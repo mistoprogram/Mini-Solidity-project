@@ -8,7 +8,7 @@ contract InvestmentPool {
     event investmentMade(uint indexed poolId, address indexed investor, uint amount, uint ownershipPercent);
     event poolStatusChanged(uint indexed poolId, string newStatus);
     event withdrawalMade(uint indexed poolId, address indexed investor, uint amount);
-    event returnDistributed(uint indexed poolId, uint indexed totalProfit);
+    event returnDistributed(uint indexed poolId, int totalProfit);
     //==================== STRUCTS ====================
     struct Investor {
         address investorAddress;
@@ -33,6 +33,7 @@ contract InvestmentPool {
 
     //==================== STATE VARIABLES ====================
     Pool[] private pools;
+    // Investor[] investors;
     mapping(uint => Investor[]) private poolInvestors;
     mapping(uint => mapping(address => Investor)) private investorByAddress;
     mapping(uint => bool) private poolExists;
@@ -44,28 +45,48 @@ contract InvestmentPool {
 
     //==================== MODIFIERS ====================
     modifier onlyPoolOwner(uint _poolId) {
-        require(poolExists[_poolId], "Pool does not exist");
-        require(pools[_poolId].owner == msg.sender, "Only pool owner can call this");
+        _onlyPoolOwner(_poolId);
         _;
     }
 
+    function _onlyPoolOwner(uint _poolId) internal view {
+        require(poolExists[_poolId], "Pool does not exist");
+        require(pools[_poolId].owner == msg.sender, "Only pool owner can call this");
+    }
+
     modifier nonReentrant() {
+        _nonReentrantBefore();
+        _;
+        _nonReentrantAfter();
+    }
+
+    function _nonReentrantBefore() internal {
         require(!locked, "No reentrancy");
         locked = true;
-        _;
+    }
+
+    function _nonReentrantAfter() internal {
         locked = false;
     }
 
     modifier validPoolId(uint _poolId) {
-        require(_poolId < poolCount, "Invalid pool ID");
-        require(poolExists[_poolId], "Pool does not exist");
+        _validPoolId(_poolId);
         _;
     }
 
-    modifier validAmount(uint _amount) {
+    function _validPoolId(uint _poolId) internal view {
+        require(_poolId < poolCount, "Invalid pool ID");
+        require(poolExists[_poolId], "Pool does not exist");
+    }
+
+   modifier validAmount(uint _amount) {
+        _validAmount(_amount);
+        _;
+    }
+
+    function _validAmount(uint _amount) internal view {
         require(_amount > 0, "Amount must be greater than 0");
         require(msg.value == _amount, "Sent amount doesn't match specified amount");
-        _;
     }
 
     //==================== CONSTRUCTOR ====================
@@ -216,22 +237,32 @@ contract InvestmentPool {
 
     function receiveReturn(uint _poolId, uint _returnAmount)
     public payable
-    onlyPoolOwner(_poolId);
+    onlyPoolOwner(_poolId)
+    validPoolId(_poolId)
     {
-        Pool storage InvestmentPool = pools[_poolId];
-        validPoolId(_poolId);
-        validAmount(_returnAmount);
+        Pool storage investmentPool = pools[_poolId];
 
-        InvestmentPool.totalReturnReceived = _returnAmount;
-        uint originalInvestment = InvestmentPool.amountRaised;
-        if _returnAmount > originalInvestment {
-            InvestmentPool.totalProfit = _returnAmount - originalInvestmet;
+        require(
+        keccak256(abi.encodePacked(investmentPool.status)) == keccak256(abi.encodePacked("closed")), 
+        "Pool must be closed first"
+        );
+        require(_returnAmount > 0, "Return amount must be greater than 0");
+        require(msg.value == _returnAmount, "Sent amount doesn't match return amount");
+
+        investmentPool.totalReturnReceived = _returnAmount;
+        uint originalInvestment = investmentPool.amountRaised;
+        uint256 returnUint = _returnAmount;
+        uint256 investmentUint = originalInvestment;
+
+        if (_returnAmount > originalInvestment) {
+            investmentPool.totalProfit = int256(returnUint - investmentUint);;
         } else {
-            InvestmentPool.totalProfit = _returnAmount - originalInvestmet;
-        };
+            investmentPool.totalProfit = int256(_returnAmount - originalInvestment);
+        }
 
         _distributeR(_poolId);
-        InvestmentPool.status = "completed"
+        investmentPool.status = "completed";
+        emit poolStatusChanged(_poolId, "completed");
     }
 
     function _distributeR(uint _poolId) 
@@ -239,17 +270,19 @@ contract InvestmentPool {
     returns(uint)
     {
         Pool storage pool = pools[_poolId];
-        investors[] memory AllInvestor = poolInvestors[_poolid];
-
-        tProfit = pool.totalProfit;
-
-        for(uint i=0; i < pool.length; i++) {
-            uint profitShare = (totalProfit * poolInvestors[i].ownershipPercent) / 10000;
-            uint tPayout = AllInvestor.amount + profitShare;
-
-            AllInvestor[_poolId][i].payoutAmount = tpayout;
+        Investor[] storage investors = poolInvestors[_poolId];  // Use storage to modify
+    
+        int tProfit = pool.totalProfit;
+    
+        // Loop through each investor
+        for(uint i = 0; i < investors.length; i++) {
+            uint profitShare = (uint(tProfit) * investors[i].ownershipPercent) / 10000;
+            uint totalPayout = investors[i].amount + profitShare;
+            
+            // Update the investor's payout amount
+            investors[i].payoutAmount = totalPayout;
         }
-
-        emit returnDistributed(_poolId, tprofit);
+        emit returnDistributed(_poolId,tProfit);
+        return tProfit
     }
 }
