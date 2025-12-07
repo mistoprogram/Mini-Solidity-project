@@ -3,7 +3,7 @@
 
 ![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-blue)
 ![License](https://img.shields.io/badge/License-UNLICENSED-red)
-![Status](https://img.shields.io/badge/Status-phase%203%20is%20in%20development-red)
+![Status](https://img.shields.io/badge/Critical%20fix-incoming-blue)
 
 ---
 
@@ -621,6 +621,11 @@ Phase 5+: ⏳ FUTURE - Token support, upgrades, etc.
 | 2.1 | Critical update| ongoing | TBA|
 
 ---
+
+## Current version problem
+we might face problems in our current version so i will put this specific section for those problems. I added a new folder inside day to day documentation called Problems, you can freely check it out.
+
+[curren problem]("./day to day documentation/Prolems/critical.md")
 
 **Happy Learning! 🚀**
 
