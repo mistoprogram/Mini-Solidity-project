@@ -501,8 +501,25 @@ withdraw(poolId); // Investor B gets 75 ETH
 - ✅ ETH transfer functionality
 - ✅ Event emission on withdrawal
 - ✅ Access control enforcement
-
 ---
+
+## Forge test result
+ran forge test for several times, the code passed 7/7 test.
+
+| Deployment cost| Deployment size| | | |  |
+| 3738841|17107| | | | |
+|-----|----|----|---|---|----|
+|Function name | Min | avg| median|max| calls|
+|closePool |  39388 | 39388|  39388| 39388|1|
+|createPool | 192564          | 192564 | 192564 | 192564 | 7|
+| getInvestorPayoutAmount                    | 7511            | 7511   | 7511   | 7511   | 6       |
+| getPoolCount                               | 2565            | 2565   | 2565   | 2565   | 1       |
+| getPoolStatus                              | 10214           | 10214  | 10214  | 10214  | 4       |
+| getTotalPooledAmount                       | 9295            | 9295   | 9295   | 9295   | 1       |
+| getTotalPooledAmount                       | 9295            | 9295   | 9295   | 9295   | 1       |
+| investIn                                   | 235108          | 259853 | 269308 | 275145 | 9       |
+| receiveReturn                              | 146432          | 207636 | 207636 | 268840 | 3       |
+| withdraw                                   | 36947           | 42311  | 39108  | 50880  | 3       |
 
 ## Conclusion
 

@@ -597,11 +597,17 @@ For questions or clarifications:
 
 ```
 Phase 1: ✅ COMPLETE - Pool Creation & Investment
-Phase 2: ✅IN PROGRESS - Return Management & Distribution
-Phase 3: ⏳ PLANNED - Investor Withdrawals
+Phase 2: ✅ COMPLETE - Return Management & Distribution
+Phase 3: ✅ COMPLETE - Investor Withdrawals
 Phase 4: ⏳ PLANNED - Advanced Features
 Phase 5+: ⏳ FUTURE - Token support, upgrades, etc.
 ```
+
+## Current critial issue
+- **String comparison is inefficient:** using keccak256(abi.encodePacked()) to compare status strings. Upcoming update will try to use enum instead.
+- **Precision loss in ownership calculation:** when calculating ownershipPercent, early investors get recalculated when new investors join. This breaks fairness.
+- **Integer overflow in profit calculation:** When _returnAmount is very large or very negative, casting to int256 could cause issues. 
+- **No emergency withdrawal:** If something goes wrong, investors are stuck. Add an emergency function that lets investors withdraw their original investment if pool gets stuck.
 
 ---
 
@@ -609,9 +615,10 @@ Phase 5+: ⏳ FUTURE - Token support, upgrades, etc.
 
 | Version | Phase | Status | Date |
 |---------|-------|--------|------|
-| 1.0 | Phase 1 | Complete | 2025-01-XX |
-| 1.1 | Phase 2 | In Development | 2025-01-XX |
-| 2.0 | Phase 3 | Planned | TBA |
+| 1.0 | Phase 1 | Complete | Dec, 6 2025|
+| 1.1 | Phase 2 | Complete | Dec, 7 2025 |
+| 2.0 | Phase 3 | Complete | Dec, 7 2025 |
+| 2.1 | Critical update| ongoing | TBA|
 
 ---
 

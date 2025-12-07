@@ -11,12 +11,12 @@ contract InvestmentPool {
     event returnDistributed(uint indexed poolId, int totalProfit);
     //==================== STRUCTS ====================
     struct Investor {
-        address investorAddress;
         uint amount;
+        uint payoutAmount;
         uint timestamp;
         uint ownershipPercent;
         bool hasWithdrawn;
-        uint payoutAmount;
+        address investorAddress;
     }
 
     struct Pool {
@@ -33,7 +33,6 @@ contract InvestmentPool {
 
     //==================== STATE VARIABLES ====================
     Pool[] private pools;
-    // Investor[] investors;
     mapping(uint => Investor[]) private poolInvestors;
     mapping(uint => mapping(address => Investor)) private investorByAddress;
     mapping(uint => bool) private poolExists;
@@ -100,12 +99,12 @@ contract InvestmentPool {
     fallback() external payable {}
 
     //Pool section
-    function createPool(uint _targetAmount, uint _deadline) public returns(uint) {
+    function createPool(uint _targetAmount, uint64 _deadline) public returns(uint) {
         require(_targetAmount > 0, "Target amount must be greater than 0");
         require(_deadline > 0, "Deadline must be in the future");
 
         uint poolId = poolCount;
-        uint deadlineTime = block.timestamp + (_deadline * 86400);
+        uint64 deadlineTime = uint64(block.timestamp + (_deadline * 86400));
 
         Pool memory newPool = Pool({
             id: poolId,
@@ -266,46 +265,64 @@ contract InvestmentPool {
     }
 
     function _distributeR(uint _poolId) 
-    private
+        private
     {
         Pool storage pool = pools[_poolId];
-        Investor[] storage investors = poolInvestors[_poolId];  // Use storage to modify
-    
+        Investor[] storage investors = poolInvestors[_poolId];
+        
         int tProfit = pool.totalProfit;
-    
+        uint totalRaised = pool.amountRaised;
+        
         // Loop through each investor
         for(uint i = 0; i < investors.length; i++) {
+            address investorAddress = investors[i].investorAddress;
+            
+            // Calculate correct ownership percentage based on final total
+            uint correctOwnershipPercent = (investors[i].amount * 10000) / totalRaised;
+            
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint profitShare = (uint(tProfit) * investors[i].ownershipPercent) / 10000;
+            uint profitShare = (uint(tProfit) * correctOwnershipPercent) / 10000;
             uint totalPayout = investors[i].amount + profitShare;
             
-            // Update the investor's payout amount
+            // Update both array AND mapping
             investors[i].payoutAmount = totalPayout;
+            investors[i].ownershipPercent = correctOwnershipPercent;  // Also update ownership
+            investorByAddress[_poolId][investorAddress].payoutAmount = totalPayout;
+            investorByAddress[_poolId][investorAddress].ownershipPercent = correctOwnershipPercent;
         }
-        emit returnDistributed(_poolId,tProfit);
+        
+        emit returnDistributed(_poolId, tProfit);
     }
 
     function withdraw(uint _poolId)
-    public
-    validPoolId(_poolId)
+        public
+        validPoolId(_poolId)
+        nonReentrant
     {
         Pool storage pool = pools[_poolId];
-        Investor[] storage investors = investorByAddress[msg.sender];
+        Investor storage investors = investorByAddress[_poolId][msg.sender];
 
         require(
-            keccak256(abi.encodedPacked(pool.status)) == keccak256(abi.encodedPacked("completed"), "Pool status must be completed!")
+            keccak256(abi.encodePacked(pool.status)) == keccak256(abi.encodePacked("completed")), 
+            "Pool status must be completed!"
         );
         require(
-            investors.hasWithdrawn == false, "you already withdrawn"
-        )l
+            !investors.hasWithdrawn, 
+            "You already withdrawn"
+        );
         require(
-            investors.payoutAmount > 0, "You don't have enough funds to withdraw"
+            investors.payoutAmount > 0, 
+            "You don't have enough funds to withdraw"
         );
 
         uint payout = investors.payoutAmount;
+        
         investors.hasWithdrawn = true;
 
-        emit withdrawDetected(_poolId,msg.sender, payout);
+        (bool success, ) = payable(msg.sender).call{value: payout}("");
+        require(success, "Withdrawal failed");
+
+        emit withdrawalMade(_poolId, msg.sender, payout);
     }
 
     function getInvestorDetails(uint _poolId, address _investorAddress) 
