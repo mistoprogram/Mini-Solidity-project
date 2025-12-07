@@ -99,7 +99,7 @@ Example:
 
 **Investor Withdraws**
 1. Investor calls withdraw function with pool ID
-2. Check if returns have been distributed
+2. Check if returns have been distribud
 3. Check if they haven't already withdrawn
 4. Send them their payout amount
 5. Mark them as withdrawn

@@ -3,7 +3,7 @@
 
 ![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-blue)
 ![License](https://img.shields.io/badge/License-UNLICENSED-red)
-![Status](https://img.shields.io/badge/Status-Phase%202%20In%20Development-yellow)
+![Status](https://img.shields.io/badge/Status-phase%203%20is%20in%20development-red)
 
 ---
 
@@ -175,7 +175,7 @@ Covers:
 - Real-time ownership calculation
 - Getter functions and data retrieval
 
-[Read Phase 1 Documentation](./docs/Phase1-Documentation.md)
+[Read Phase 1 Documentation]("./day to day documentation/day1.md")
 
 ### Phase 2: Return Management
 **File:** `docs/Phase2-Documentation.md`
@@ -187,7 +187,7 @@ Covers:
 - Error handling and edge cases
 - Gas optimization strategies
 
-[Read Phase 2 Documentation](./docs/Phase2-Documentation.md)
+[Read Phase 2 Documentation]("./day to day documentation/day2.md")
 
 ### System Flowchart
 **Interactive Diagram:** [Claude Artifacts Flowchart](https://claude.ai/public/artifacts/f843d054-7990-49e7-adc9-5a3fef1e5b26)

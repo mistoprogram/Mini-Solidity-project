@@ -284,4 +284,156 @@ contract InvestmentPool {
         }
         emit returnDistributed(_poolId,tProfit);
     }
+
+    function withdraw(uint _poolId)
+    public
+    validPoolId(_poolId)
+    {
+        Pool storage pool = pools[_poolId];
+        Investor[] storage investors = investorByAddress[msg.sender];
+
+        require(
+            keccak256(abi.encodedPacked(pool.status)) == keccak256(abi.encodedPacked("completed"), "Pool status must be completed!")
+        );
+        require(
+            investors.hasWithdrawn == false, "you already withdrawn"
+        )l
+        require(
+            investors.payoutAmount > 0, "You don't have enough funds to withdraw"
+        );
+
+        uint payout = investors.payoutAmount;
+        investors.hasWithdrawn = true;
+
+        emit withdrawDetected(_poolId,msg.sender, payout);
+    }
+
+    function getInvestorDetails(uint _poolId, address _investorAddress) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(Investor memory) 
+    {
+        return investorByAddress[_poolId][_investorAddress];
+    }
+
+    function getTotalPooledAmount(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(uint) 
+    {
+        return pools[_poolId].amountRaised;
+    }
+
+    function getPoolStatus(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(string memory) 
+    {
+        return pools[_poolId].status;
+    }
+
+    function hasDeadlinePassed(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(bool) 
+    {
+        return block.timestamp > pools[_poolId].deadline;
+    }
+
+    function getInvestorPayoutAmount(uint _poolId, address _investorAddress) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(uint) 
+    {
+        return investorByAddress[_poolId][_investorAddress].payoutAmount;
+    }
+
+    function getAllPools() 
+    public 
+    view 
+    returns(Pool[] memory) 
+    {
+        return pools;
+    }
+
+    function getPoolProgress(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(Pool memory, uint) 
+    {
+        Pool memory pool = pools[_poolId];
+        uint progress = (pool.amountRaised * 100) / pool.targetAmount;
+        return (pool, progress);
+    }
+
+    function isInvestor(uint _poolId, address _investorAddress) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(bool) 
+    {
+        return investorByAddress[_poolId][_investorAddress].amount > 0;
+    }   
+
+    function getRemainingAmount(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(uint) 
+    {
+        Pool memory pool = pools[_poolId];
+        if (pool.amountRaised >= pool.targetAmount) {
+            return 0;
+        }
+        return pool.targetAmount - pool.amountRaised;
+    }
+
+    function getTotalProfit(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(int) 
+    {
+        return pools[_poolId].totalProfit;
+    }
+
+    function getPoolFullInfo(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(
+        Pool memory,
+        uint investorCount,
+        uint progressPercent,
+        uint timeRemaining,
+        bool deadlinePassed
+    ) 
+    {
+        Pool memory pool = pools[_poolId];
+        uint investors = poolInvestors[_poolId].length;
+        uint progress = (pool.amountRaised * 100) / pool.targetAmount;
+        uint timeLeft = block.timestamp >= pool.deadline ? 0 : pool.deadline - block.timestamp;
+        bool passed = block.timestamp > pool.deadline;
+        
+        return (pool, investors, progress, timeLeft, passed);
+    }
+
+    function getTimeUntilDeadline(uint _poolId) 
+    public 
+    view 
+    validPoolId(_poolId) 
+    returns(uint) 
+    {
+        Pool memory pool = pools[_poolId];
+        if (block.timestamp >= pool.deadline) {
+            return 0;
+        }
+        return pool.deadline - block.timestamp;
+    }
 }
