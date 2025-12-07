@@ -6,7 +6,7 @@ contract InvestmentPool {
     //==================== EVENTS ====================
     event poolCreated(uint indexed id, address indexed owner, uint targetAmount, uint deadline);
     event investmentMade(uint indexed poolId, address indexed investor, uint amount, uint ownershipPercent);
-    event poolStatusChanged(uint indexed poolId, string newStatus);
+    event poolStatusChanged(uint indexed poolId, sts newStatus);
     event withdrawalMade(uint indexed poolId, address indexed investor, uint amount);
     event returnDistributed(uint indexed poolId, int totalProfit);
     //==================== STRUCTS ====================
@@ -21,17 +21,18 @@ contract InvestmentPool {
 
     struct Pool {
         uint id;
-        address owner;
         uint targetAmount;
         uint amountRaised;
         uint deadline;
-        string status;
         uint totalReturnReceived;
         int totalProfit;
         uint payoutAmount;
+        address owner;
+        sts status;
     }
 
     //==================== STATE VARIABLES ====================
+    enum sts = {open, closed, complete};
     Pool[] private pools;
     mapping(uint => Investor[]) private poolInvestors;
     mapping(uint => mapping(address => Investor)) private investorByAddress;
@@ -139,7 +140,7 @@ contract InvestmentPool {
 
         // Validation checks
         require(
-            keccak256(abi.encodePacked(pool.status)) == keccak256(abi.encodePacked("open")),
+            pool.status == sts.open,
             "Pool is not open for investment"
         );
         require(block.timestamp <= pool.deadline, "Investment deadline has passed");
@@ -169,8 +170,8 @@ contract InvestmentPool {
 
         // Auto-close pool if target reached
         if (pool.amountRaised >= pool.targetAmount) {
-            pool.status = "closed";
-            emit poolStatusChanged(_poolId, "closed");
+            pool.status = sts.closed;
+            emit poolStatusChanged(_poolId, pool.status);
         }
     }
 
@@ -226,11 +227,11 @@ contract InvestmentPool {
         );
         
         require(
-            keccak256(abi.encodePacked(pool.status)) == keccak256(abi.encodePacked("open")),
+            pool.status == sts.open,
             "Pool is already closed"
         );
         
-        pool.status = "closed";
+        pool.status = sts.closed;
         emit poolStatusChanged(_poolId, "closed");
     }
 
@@ -242,7 +243,7 @@ contract InvestmentPool {
         Pool storage investmentPool = pools[_poolId];
 
         require(
-        keccak256(abi.encodePacked(investmentPool.status)) == keccak256(abi.encodePacked("closed")), 
+        investmentPool.status == sts.closed, 
         "Pool must be closed first"
         );
         require(_returnAmount > 0, "Return amount must be greater than 0");
@@ -260,8 +261,8 @@ contract InvestmentPool {
         }
 
         _distributeR(_poolId);
-        investmentPool.status = "completed";
-        emit poolStatusChanged(_poolId, "completed");
+        investmentPool.status = sts.complete;
+        emit poolStatusChanged(_poolId, sts.complete);
     }
 
     function _distributeR(uint _poolId) 
@@ -281,7 +282,7 @@ contract InvestmentPool {
             uint correctOwnershipPercent = (investors[i].amount * 10000) / totalRaised;
             
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint profitShare = (uint(tProfit) * correctOwnershipPercent) / 10000;
+            uint profitShare = (tProfit * correctOwnershipPercent) / 10000;
             uint totalPayout = investors[i].amount + profitShare;
             
             // Update both array AND mapping
@@ -303,7 +304,7 @@ contract InvestmentPool {
         Investor storage investors = investorByAddress[_poolId][msg.sender];
 
         require(
-            keccak256(abi.encodePacked(pool.status)) == keccak256(abi.encodePacked("completed")), 
+            pool.status == sts.complete, 
             "Pool status must be completed!"
         );
         require(
