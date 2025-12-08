@@ -612,14 +612,15 @@ Phase 5+: ⏳ FUTURE - Token support, upgrades, etc.
 | 1.0 | Phase 1 | Complete | Dec, 6 2025|
 | 1.1 | Phase 2 | Complete | Dec, 7 2025 |
 | 2.0 | Phase 3 | Complete | Dec, 7 2025 |
-| 2.1 | Critical update| ongoing | TBA|
+| 2.1 | Critical update| complete | Dec, 8 2025|
+| 2.2 | testing and emergency features| ongoing| TBA|
 
 ---
 
 ## Current version problem
 we might face problems in our current version so i will put this specific section for those problems. I added a new folder inside day to day documentation called Problems, you can freely check it out.
 
-[curren problem]("./day to day documentation/Prolems/critical.md")
+**we're currently have no issue in this version except the emergency features missing. I'm working on it right now.**
 
 **Happy Learning! 🚀**
 
