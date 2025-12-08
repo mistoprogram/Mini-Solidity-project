@@ -1,18 +1,25 @@
 // SPDX-License-Identifier: UNLICENSED 
 pragma solidity ^0.8.20;
 
-contract InvestmentPool {
+contract GlobalVar {
     
+    enum sts {
+        open,
+        closed,
+        complete
+    }
+
     //==================== EVENTS ====================
     event poolCreated(uint indexed id, address indexed owner, uint targetAmount, uint deadline);
     event investmentMade(uint indexed poolId, address indexed investor, uint amount, uint ownershipPercent);
     event poolStatusChanged(uint indexed poolId, sts newStatus);
     event withdrawalMade(uint indexed poolId, address indexed investor, uint amount);
     event returnDistributed(uint indexed poolId, int totalProfit);
+    
     //==================== STRUCTS ====================
     struct Investor {
         uint amount;
-        uint payoutAmount;
+        int payoutAmount;
         uint timestamp;
         uint ownershipPercent;
         bool hasWithdrawn;
@@ -26,22 +33,21 @@ contract InvestmentPool {
         uint deadline;
         uint totalReturnReceived;
         int totalProfit;
-        uint payoutAmount;
+        int payoutAmount;
         address owner;
         sts status;
     }
 
     //==================== STATE VARIABLES ====================
-    enum sts = {open, closed, complete};
-    Pool[] private pools;
-    mapping(uint => Investor[]) private poolInvestors;
-    mapping(uint => mapping(address => Investor)) private investorByAddress;
-    mapping(uint => bool) private poolExists;
+    Pool[] internal pools;
+    mapping(uint => Investor[]) internal poolInvestors;
+    mapping(uint => mapping(address => Investor)) internal investorByAddress;
+    mapping(uint => bool) internal poolExists;
 
     uint public poolCount = 0;
     address public contractOwner;
     
-    bool private locked; // Reentrancy guard
+    bool internal locked; // Reentrancy guard
 
     //==================== MODIFIERS ====================
     modifier onlyPoolOwner(uint _poolId) {
@@ -79,7 +85,7 @@ contract InvestmentPool {
         require(poolExists[_poolId], "Pool does not exist");
     }
 
-   modifier validAmount(uint _amount) {
+    modifier validAmount(uint _amount) {
         _validAmount(_amount);
         _;
     }
@@ -94,8 +100,9 @@ contract InvestmentPool {
         contractOwner = msg.sender;
         locked = false;
     }
+}
 
-    //make contract able to receive payment
+contract PoolManagement is GlobalVar {
     receive() external payable {}
     fallback() external payable {}
 
@@ -113,7 +120,7 @@ contract InvestmentPool {
             targetAmount: _targetAmount,
             amountRaised: 0,
             deadline: deadlineTime,
-            status: "open",
+            status: sts.open,
             totalReturnReceived: 0,
             totalProfit: 0,
             payoutAmount:0
@@ -174,8 +181,114 @@ contract InvestmentPool {
             emit poolStatusChanged(_poolId, pool.status);
         }
     }
+}
 
-    //==================== GETTER FUNCTIONS ====================
+contract Admin is GlobalVar {
+    //==================== ADMIN FUNCTIONS ====================
+    function closePool(uint _poolId) 
+        public 
+        onlyPoolOwner(_poolId) 
+    {
+        Pool storage pool = pools[_poolId];
+        require(
+            block.timestamp > pool.deadline, "Deadline has not yet passed"
+        );
+        
+        require(
+            pool.status == sts.open,
+            "Pool is already closed"
+        );
+        
+        pool.status = sts.closed;
+        emit poolStatusChanged(_poolId, pool.status);
+    }
+
+    function receiveReturn(uint _poolId, uint _returnAmount)
+        public 
+        payable
+        onlyPoolOwner(_poolId)
+        validPoolId(_poolId)
+    {
+        Pool storage investmentPool = pools[_poolId];
+
+        require(
+            investmentPool.status == sts.closed, 
+            "Pool must be closed first"
+        );
+        require(_returnAmount > 0, "Return amount must be greater than 0");
+        require(msg.value == _returnAmount, "Sent amount doesn't match return amount");
+
+        investmentPool.totalReturnReceived = _returnAmount;
+        uint originalInvestment = investmentPool.amountRaised;
+
+        if (_returnAmount > originalInvestment) {
+            investmentPool.totalProfit = int256(_returnAmount - originalInvestment);
+        } else {
+            investmentPool.totalProfit = -int256(originalInvestment - _returnAmount);
+        }
+
+        _distributeR(_poolId);
+        investmentPool.status = sts.complete;
+        emit poolStatusChanged(_poolId, sts.complete);
+    }
+
+    function _distributeR(uint _poolId) 
+        internal
+    {
+        Pool storage pool = pools[_poolId];
+        Investor[] storage investors = poolInvestors[_poolId];
+        
+        int tProfit = pool.totalProfit;
+        uint totalRaised = pool.amountRaised;
+        
+        // Loop through each investor
+        for(uint i = 0; i < investors.length; i++) {
+            uint correctOwnershipPercent = (investors[i].amount * 10000) / totalRaised;
+            
+            int profitShare = (tProfit * int(correctOwnershipPercent)) / 10000;
+            int totalPayout = int(investors[i].amount) + profitShare;
+            
+            // Update
+            investors[i].payoutAmount = totalPayout;
+            investors[i].ownershipPercent = correctOwnershipPercent;
+        }
+        
+        emit returnDistributed(_poolId, tProfit);
+    }
+
+    function withdraw(uint _poolId)
+        public
+        validPoolId(_poolId)
+        nonReentrant
+    {
+        Pool storage pool = pools[_poolId];
+        Investor storage investors = investorByAddress[_poolId][msg.sender];
+
+        require(
+            pool.status == sts.complete, 
+            "Pool status must be completed!"
+        );
+        require(
+            !investors.hasWithdrawn, 
+            "You already withdrawn"
+        );
+        require(
+            investors.payoutAmount > 0, 
+            "You don't have enough funds to withdraw"
+        );
+
+        int payout = investors.payoutAmount;
+        
+        investors.hasWithdrawn = true;
+
+        (bool success, ) = payable(msg.sender).call{value: uint(payout)}("");
+        require(success, "Withdrawal failed");
+
+        emit withdrawalMade(_poolId, msg.sender, uint(payout));
+    }
+}
+
+contract GetterFunction is GlobalVar {
     function getPoolDetail(uint _poolId) 
         public 
         view 
@@ -216,174 +329,64 @@ contract InvestmentPool {
         return poolCount;
     }
 
-    //==================== ADMIN FUNCTIONS ====================
-    function closePool(uint _poolId) 
-        public 
-        onlyPoolOwner(_poolId) 
-    {
-        Pool storage pool = pools[_poolId];
-        require(
-            block.timestamp > pool.deadline, "Deadline has not yet passed"
-        );
-        
-        require(
-            pool.status == sts.open,
-            "Pool is already closed"
-        );
-        
-        pool.status = sts.closed;
-        emit poolStatusChanged(_poolId, "closed");
-    }
-
-    function receiveReturn(uint _poolId, uint _returnAmount)
-    public payable
-    onlyPoolOwner(_poolId)
-    validPoolId(_poolId)
-    {
-        Pool storage investmentPool = pools[_poolId];
-
-        require(
-        investmentPool.status == sts.closed, 
-        "Pool must be closed first"
-        );
-        require(_returnAmount > 0, "Return amount must be greater than 0");
-        require(msg.value == _returnAmount, "Sent amount doesn't match return amount");
-
-        investmentPool.totalReturnReceived = _returnAmount;
-        uint originalInvestment = investmentPool.amountRaised;
-
-        if (_returnAmount > originalInvestment) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            investmentPool.totalProfit = int256(_returnAmount - originalInvestment);
-        } else {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            investmentPool.totalProfit = int256(_returnAmount - originalInvestment);
-        }
-
-        _distributeR(_poolId);
-        investmentPool.status = sts.complete;
-        emit poolStatusChanged(_poolId, sts.complete);
-    }
-
-    function _distributeR(uint _poolId) 
-        private
-    {
-        Pool storage pool = pools[_poolId];
-        Investor[] storage investors = poolInvestors[_poolId];
-        
-        int tProfit = pool.totalProfit;
-        uint totalRaised = pool.amountRaised;
-        
-        // Loop through each investor
-        for(uint i = 0; i < investors.length; i++) {
-            address investorAddress = investors[i].investorAddress;
-            
-            // Calculate correct ownership percentage based on final total
-            uint correctOwnershipPercent = (investors[i].amount * 10000) / totalRaised;
-            
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint profitShare = (tProfit * correctOwnershipPercent) / 10000;
-            uint totalPayout = investors[i].amount + profitShare;
-            
-            // Update both array AND mapping
-            investors[i].payoutAmount = totalPayout;
-            investors[i].ownershipPercent = correctOwnershipPercent;  // Also update ownership
-            investorByAddress[_poolId][investorAddress].payoutAmount = totalPayout;
-            investorByAddress[_poolId][investorAddress].ownershipPercent = correctOwnershipPercent;
-        }
-        
-        emit returnDistributed(_poolId, tProfit);
-    }
-
-    function withdraw(uint _poolId)
-        public
-        validPoolId(_poolId)
-        nonReentrant
-    {
-        Pool storage pool = pools[_poolId];
-        Investor storage investors = investorByAddress[_poolId][msg.sender];
-
-        require(
-            pool.status == sts.complete, 
-            "Pool status must be completed!"
-        );
-        require(
-            !investors.hasWithdrawn, 
-            "You already withdrawn"
-        );
-        require(
-            investors.payoutAmount > 0, 
-            "You don't have enough funds to withdraw"
-        );
-
-        uint payout = investors.payoutAmount;
-        
-        investors.hasWithdrawn = true;
-
-        (bool success, ) = payable(msg.sender).call{value: payout}("");
-        require(success, "Withdrawal failed");
-
-        emit withdrawalMade(_poolId, msg.sender, payout);
-    }
-
     function getInvestorDetails(uint _poolId, address _investorAddress) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(Investor memory) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(Investor memory) 
     {
         return investorByAddress[_poolId][_investorAddress];
     }
 
     function getTotalPooledAmount(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(uint) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(uint) 
     {
         return pools[_poolId].amountRaised;
     }
 
     function getPoolStatus(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(string memory) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(sts) 
     {
         return pools[_poolId].status;
     }
 
     function hasDeadlinePassed(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(bool) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(bool) 
     {
         return block.timestamp > pools[_poolId].deadline;
     }
 
     function getInvestorPayoutAmount(uint _poolId, address _investorAddress) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(uint) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(int) 
     {
         return investorByAddress[_poolId][_investorAddress].payoutAmount;
     }
 
     function getAllPools() 
-    public 
-    view 
-    returns(Pool[] memory) 
+        public 
+        view 
+        returns(Pool[] memory) 
     {
         return pools;
     }
 
     function getPoolProgress(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(Pool memory, uint) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(Pool memory, uint) 
     {
         Pool memory pool = pools[_poolId];
         uint progress = (pool.amountRaised * 100) / pool.targetAmount;
@@ -391,19 +394,19 @@ contract InvestmentPool {
     }
 
     function isInvestor(uint _poolId, address _investorAddress) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(bool) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(bool) 
     {
         return investorByAddress[_poolId][_investorAddress].amount > 0;
     }   
 
     function getRemainingAmount(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(uint) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(uint) 
     {
         Pool memory pool = pools[_poolId];
         if (pool.amountRaised >= pool.targetAmount) {
@@ -413,25 +416,25 @@ contract InvestmentPool {
     }
 
     function getTotalProfit(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(int) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(int) 
     {
         return pools[_poolId].totalProfit;
     }
 
     function getPoolFullInfo(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(
-        Pool memory,
-        uint investorCount,
-        uint progressPercent,
-        uint timeRemaining,
-        bool deadlinePassed
-    ) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(
+            Pool memory,
+            uint investorCount,
+            uint progressPercent,
+            uint timeRemaining,
+            bool deadlinePassed
+        ) 
     {
         Pool memory pool = pools[_poolId];
         uint investors = poolInvestors[_poolId].length;
@@ -443,10 +446,10 @@ contract InvestmentPool {
     }
 
     function getTimeUntilDeadline(uint _poolId) 
-    public 
-    view 
-    validPoolId(_poolId) 
-    returns(uint) 
+        public 
+        view 
+        validPoolId(_poolId) 
+        returns(uint) 
     {
         Pool memory pool = pools[_poolId];
         if (block.timestamp >= pool.deadline) {

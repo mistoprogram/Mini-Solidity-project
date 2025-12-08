@@ -166,7 +166,6 @@ Charlie's payout: 60 ETH + (20 ETH × 60%) = 72 ETH
 ## 📖 Documentation
 
 ### Phase 1: Core Architecture
-**File:** `docs/Phase1-Documentation.md`
 
 Covers:
 - Data structures and state management
@@ -175,10 +174,7 @@ Covers:
 - Real-time ownership calculation
 - Getter functions and data retrieval
 
-[Read Phase 1 Documentation]("./day to day documentation/day1.md")
-
 ### Phase 2: Return Management
-**File:** `docs/Phase2-Documentation.md`
 
 Covers:
 - Pool closure procedures
@@ -186,8 +182,6 @@ Covers:
 - Distribution algorithm
 - Error handling and edge cases
 - Gas optimization strategies
-
-[Read Phase 2 Documentation]("./day to day documentation/day2.md")
 
 ### System Flowchart
 **Interactive Diagram:** [Claude Artifacts Flowchart](https://claude.ai/public/artifacts/f843d054-7990-49e7-adc9-5a3fef1e5b26)
