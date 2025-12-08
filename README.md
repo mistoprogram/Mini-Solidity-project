@@ -9,6 +9,8 @@
 
 ## 📋 Overview
 
+**Disclaimer:** this project is a documented learning project where i learn solidity by building Dapp.
+
 A comprehensive smart contract system for managing decentralized investment pools on the Ethereum blockchain. Pool creators can launch investment campaigns with target amounts and deadlines, while investors contribute funds and receive proportional ownership. Returns are then distributed based on each investor's contribution percentage.
 
 ### Key Features

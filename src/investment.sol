@@ -281,10 +281,10 @@ contract Admin is GlobalVar {
         
         investors.hasWithdrawn = true;
 
-        (bool success, ) = payable(msg.sender).call{value: uint(payout)}("");
+        (bool success, ) = payable(msg.sender).call{value: uint256(payout)}("");
         require(success, "Withdrawal failed");
 
-        emit withdrawalMade(_poolId, msg.sender, uint(payout));
+        emit withdrawalMade(_poolId, msg.sender, uint256(payout));
     }
 }
 

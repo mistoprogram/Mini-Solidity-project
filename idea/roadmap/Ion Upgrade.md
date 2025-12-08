@@ -1,15 +1,7 @@
 # Investment Pool Platform: 10x Scale Roadmap
 
 ## Author's note
-this upgrage isn't guaranteed, i'll try to match the phase overtime with my skill
-
-## Vision Statement
-
-Transform Investment Pool from a basic crowdfunding smart contract into **the institutional-grade platform for decentralized investment fund management**. Position it as the infrastructure layer that VCs, family offices, hedge funds, and crypto protocols use to deploy capital transparently on-chain.
-
-**Target**: Multi-billion dollar AUM, millions of active pools, trusted by institutions globally.
-
----
+this upgrage isn't guaranteed, i'll try to match the phase overtime with my skill. This upgrade is suggested by claude imagining if this project is priced and 10x the current price what would i can add into it.
 
 ## Roadmap Overview Timeline
 
