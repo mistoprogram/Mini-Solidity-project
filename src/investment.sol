@@ -6,7 +6,13 @@ contract GlobalVar {
     enum sts {
         open,
         closed,
-        complete
+        complete,
+        stuck,
+        EmergencyWithdraw
+    }
+
+    enum emergency {
+        inactive
     }
 
     //==================== EVENTS ====================
@@ -15,6 +21,9 @@ contract GlobalVar {
     event poolStatusChanged(uint indexed poolId, sts newStatus);
     event withdrawalMade(uint indexed poolId, address indexed investor, uint amount);
     event returnDistributed(uint indexed poolId, int totalProfit);
+    
+    // emergency events
+    event emergencyWithdraw(uint indexed poolId, emergency Emergency)
     
     //==================== STRUCTS ====================
     struct Investor {
@@ -183,7 +192,7 @@ contract PoolManagement is GlobalVar {
     }
 }
 
-contract Admin is GlobalVar {
+contract Admin is PoolManagement {
     //==================== ADMIN FUNCTIONS ====================
     function closePool(uint _poolId) 
         public 
@@ -288,7 +297,59 @@ contract Admin is GlobalVar {
     }
 }
 
-contract GetterFunction is GlobalVar {
+contract emergency is Admin {
+    function ownerInactive(uint _poolId) public {
+        Pool storage pool = pools[_poolId];
+        require(
+            block.timestamp > pool.deadline + (7 / 86400), "Not yet eligible"
+        );
+        require(
+            !investors.hasWithdrawn, 
+            "You already withdrawn"
+        );
+        require(
+            investors.payoutAmount > 0, 
+            "You don't have enough funds to withdraw"
+        );
+
+        pool.status = sts.stuck;
+        emergencyWithdraw(_poolId);
+    }
+
+    function emergencyWithdraw(uint _poolId)
+    public 
+    validPoolId(_poolId)
+    {
+        Pool storage pool = pools[_poolId];
+        Investor[] storage investors = poolInvestors[_poolId];
+
+        require(
+            pool.status == sts.stuck, "emergency invalid"
+        );
+
+        for(i = 0; i < investors.length; i++){
+            uint correctOwnershipPercent = (investors[i].amount * 10000) / totalRaised;
+            
+            int profitShare = (tProfit * int(correctOwnershipPercent)) / 10000;
+            int totalPayout = int(investors[i].amount) + profitShare;
+            
+            // Update
+            investors[i].payoutAmount = totalPayout;
+            investors[i].ownershipPercent = correctOwnershipPercent;
+
+            int payout = investors.payoutAmount;
+
+            (bool success, ) = payable(investors[i].investorAddress).call{value: uint256(payout)}("");
+        }
+        require(
+            success, "emergency withdrawal failed"
+        );
+
+        emit emergencyWithdraw(_poolId, emergency.inactive);
+    }
+}
+
+contract GetterFunction is emergency {
     function getPoolDetail(uint _poolId) 
         public 
         view 
