@@ -615,14 +615,16 @@ Phase 5+: ⏳ FUTURE - Token support, upgrades, etc.
 | 1.1 | Phase 2 | Complete | Dec, 7 2025 |
 | 2.0 | Phase 3 | Complete | Dec, 7 2025 |
 | 2.1 | Critical update| complete | Dec, 8 2025|
-| 2.2 | testing and emergency features| ongoing| TBA|
+| 2.2 | MVP emergency feature| complete | Dec, 9 2025|
+| 2.4 | front-end and openZappelin MVP | Planned | TBA |
+| 3 | front-end ready | Planned | TBA|
 
 ---
 
 ## Current version problem
 we might face problems in our current version so i will put this specific section for those problems. I added a new folder inside day to day documentation called Problems, you can freely check it out.
 
-**we're currently have no issue in this version except the emergency features missing. I'm working on it right now.**
+**we're currently have no issue in this version.**
 
 **Happy Learning! 🚀**
 

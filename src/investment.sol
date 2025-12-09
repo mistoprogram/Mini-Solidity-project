@@ -11,8 +11,8 @@ contract GlobalVar {
         EmergencyWithdraw
     }
 
-    enum emergency {
-        inactive
+    enum EmergencyType {
+        ownerInactive
     }
 
     //==================== EVENTS ====================
@@ -23,7 +23,7 @@ contract GlobalVar {
     event returnDistributed(uint indexed poolId, int totalProfit);
     
     // emergency events
-    event emergencyWithdraw(uint indexed poolId, emergency Emergency)
+    event emergencyWithdrawTriggered(uint indexed poolId, EmergencyType emergencyType);
     
     //==================== STRUCTS ====================
     struct Investor {
@@ -45,6 +45,7 @@ contract GlobalVar {
         int payoutAmount;
         address owner;
         sts status;
+        uint lastOwnerActivity;
     }
 
     //==================== STATE VARIABLES ====================
@@ -57,6 +58,8 @@ contract GlobalVar {
     address public contractOwner;
     
     bool internal locked; // Reentrancy guard
+    
+    uint internal constant EMERGENCY_INACTIVE_PERIOD = 7 days; // Time before owner inactivity triggers emergency
 
     //==================== MODIFIERS ====================
     modifier onlyPoolOwner(uint _poolId) {
@@ -132,7 +135,8 @@ contract PoolManagement is GlobalVar {
             status: sts.open,
             totalReturnReceived: 0,
             totalProfit: 0,
-            payoutAmount:0
+            payoutAmount: 0,
+            lastOwnerActivity: block.timestamp
         });
 
         pools.push(newPool);
@@ -175,7 +179,7 @@ contract PoolManagement is GlobalVar {
             timestamp: block.timestamp,
             ownershipPercent: ownershipBps,
             hasWithdrawn: false,
-            payoutAmount:0
+            payoutAmount: 0
         });
 
         // Store investor
@@ -209,6 +213,7 @@ contract Admin is PoolManagement {
         );
         
         pool.status = sts.closed;
+        pool.lastOwnerActivity = block.timestamp;
         emit poolStatusChanged(_poolId, pool.status);
     }
 
@@ -238,6 +243,7 @@ contract Admin is PoolManagement {
 
         _distributeR(_poolId);
         investmentPool.status = sts.complete;
+        investmentPool.lastOwnerActivity = block.timestamp;
         emit poolStatusChanged(_poolId, sts.complete);
     }
 
@@ -271,24 +277,24 @@ contract Admin is PoolManagement {
         nonReentrant
     {
         Pool storage pool = pools[_poolId];
-        Investor storage investors = investorByAddress[_poolId][msg.sender];
+        Investor storage investor = investorByAddress[_poolId][msg.sender];
 
         require(
             pool.status == sts.complete, 
             "Pool status must be completed!"
         );
         require(
-            !investors.hasWithdrawn, 
+            !investor.hasWithdrawn, 
             "You already withdrawn"
         );
         require(
-            investors.payoutAmount > 0, 
+            investor.payoutAmount > 0, 
             "You don't have enough funds to withdraw"
         );
 
-        int payout = investors.payoutAmount;
+        int payout = investor.payoutAmount;
         
-        investors.hasWithdrawn = true;
+        investor.hasWithdrawn = true;
 
         (bool success, ) = payable(msg.sender).call{value: uint256(payout)}("");
         require(success, "Withdrawal failed");
@@ -297,59 +303,63 @@ contract Admin is PoolManagement {
     }
 }
 
-contract emergency is Admin {
-    function ownerInactive(uint _poolId) public {
-        Pool storage pool = pools[_poolId];
-        require(
-            block.timestamp > pool.deadline + (7 / 86400), "Not yet eligible"
-        );
-        require(
-            !investors.hasWithdrawn, 
-            "You already withdrawn"
-        );
-        require(
-            investors.payoutAmount > 0, 
-            "You don't have enough funds to withdraw"
-        );
-
-        pool.status = sts.stuck;
-        emergencyWithdraw(_poolId);
-    }
-
-    function emergencyWithdraw(uint _poolId)
-    public 
-    validPoolId(_poolId)
+contract Emergency is Admin {
+    //==================== EMERGENCY FUNCTIONS ====================
+    
+    function checkOwnerInactivity(uint _poolId) 
+        public 
+        validPoolId(_poolId) 
     {
         Pool storage pool = pools[_poolId];
-        Investor[] storage investors = poolInvestors[_poolId];
+        
+        require(
+            pool.status == sts.closed || pool.status == sts.complete,
+            "Pool must be closed or complete"
+        );
+        
+        require(
+            block.timestamp > pool.lastOwnerActivity + EMERGENCY_INACTIVE_PERIOD,
+            "Owner is still active"
+        );
+        
+        pool.status = sts.stuck;
+        emit poolStatusChanged(_poolId, pool.status);
+    }
+
+    function emergencyWithdrawal(uint _poolId)
+        public 
+        validPoolId(_poolId)
+        nonReentrant
+    {
+        Pool storage pool = pools[_poolId];
+        Investor storage investor = investorByAddress[_poolId][msg.sender];
 
         require(
-            pool.status == sts.stuck, "emergency invalid"
+            pool.status == sts.stuck, 
+            "Pool is not in stuck state"
         );
-
-        for(i = 0; i < investors.length; i++){
-            uint correctOwnershipPercent = (investors[i].amount * 10000) / totalRaised;
-            
-            int profitShare = (tProfit * int(correctOwnershipPercent)) / 10000;
-            int totalPayout = int(investors[i].amount) + profitShare;
-            
-            // Update
-            investors[i].payoutAmount = totalPayout;
-            investors[i].ownershipPercent = correctOwnershipPercent;
-
-            int payout = investors.payoutAmount;
-
-            (bool success, ) = payable(investors[i].investorAddress).call{value: uint256(payout)}("");
-        }
+        
         require(
-            success, "emergency withdrawal failed"
+            !investor.hasWithdrawn, 
+            "You already withdrawn"
+        );
+        
+        require(
+            investor.payoutAmount > 0, 
+            "You don't have funds to withdraw"
         );
 
-        emit emergencyWithdraw(_poolId, emergency.inactive);
+        int payout = investor.payoutAmount;
+        investor.hasWithdrawn = true;
+
+        (bool success, ) = payable(msg.sender).call{value: uint256(payout)}("");
+        require(success, "Emergency withdrawal failed");
+
+        emit emergencyWithdrawTriggered(_poolId, EmergencyType.ownerInactive);
     }
 }
 
-contract GetterFunction is emergency {
+contract GetterFunction is Emergency {
     function getPoolDetail(uint _poolId) 
         public 
         view 

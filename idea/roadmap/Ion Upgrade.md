@@ -78,7 +78,7 @@ Before scaling, we need a bulletproof base. This phase fixes critical issues, op
   - Allows frontend to process multiple withdrawals in one transaction
 
 #### 1.4 Security Hardening
-- **Formal audit ready**
+- **Formal audit ready**  
   - Follow OpenZeppelin contract patterns
   - Add access control using standard interfaces
   - Implement checks-effects-interactions strictly
