@@ -26,6 +26,16 @@ contract GlobalVar {
     event emergencyWithdrawTriggered(uint indexed poolId, EmergencyType emergencyType);
     
     //==================== STRUCTS ====================
+    
+    struct Strategy{
+        uint strategyId;
+        uint[] assetsAmount;
+        uint[] assetsPercentage;
+        uint deadline;
+        string[] assets;
+        bool riskLimit;
+    }
+    
     struct Investor {
         uint amount;
         int payoutAmount;
@@ -44,8 +54,9 @@ contract GlobalVar {
         int totalProfit;
         int payoutAmount;
         address owner;
-        sts status;
         uint lastOwnerActivity;
+        sts status;
+        Strategy poolstrategy;
     }
 
     //==================== STATE VARIABLES ====================
@@ -53,6 +64,7 @@ contract GlobalVar {
     mapping(uint => Investor[]) internal poolInvestors;
     mapping(uint => mapping(address => Investor)) internal investorByAddress;
     mapping(uint => bool) internal poolExists;
+    mapping(uint => Strategy) internal poolStrategies;
 
     uint public poolCount = 0;
     address public contractOwner;
@@ -136,7 +148,15 @@ contract PoolManagement is GlobalVar {
             totalReturnReceived: 0,
             totalProfit: 0,
             payoutAmount: 0,
-            lastOwnerActivity: block.timestamp
+            lastOwnerActivity: block.timestamp,
+            poolstrategy: Strategy({  // Add this
+                strategyId: 0,
+                assetsAmount: new uint[](0),
+                assetsPercentage: new uint[](0),
+                deadline: 0,
+                assets: new string[](0),
+                riskLimit: false
+            })
         });
 
         pools.push(newPool);
@@ -196,7 +216,59 @@ contract PoolManagement is GlobalVar {
     }
 }
 
-contract Admin is PoolManagement {
+contract investmentStrategy is PoolManagement{
+
+    uint public idCount = 0;
+
+    function scaleUp(uint[] storage x)
+    internal
+    returns(uint)
+    {
+        for(uint i = 0; i < x.length; i++) {
+            x[i] = x[i] * 1e6;
+        }
+        return x;
+    }
+
+    function setStrategy(uint _poolId,
+    string[] memory _assets,
+    uint[] memory _percentages,
+    uint _deadline
+    )
+    internal
+    onlyPoolOwner(_poolId)
+    nonReentrant
+    {
+        Pool storage pool = pools[_poolId];
+        uint newId = idCount;
+        uint64 investmentDeadline = uint64(block.timestamp + (_deadline * 86400));
+        Strategy storage strat = pool.poolstrategy;
+        uint[] storage percentage = strat.assetsPercentage;
+        uint[] storage assetAmountBps = strat.assetsAmount;
+        uint256 totalCapital = pool.amountRaised * 1e18;
+
+        scaleUp(percentage);
+        
+        for(uint i = 0; i < percentage.length; i++) {
+            assetAmountBps[i] = (percentage[i] * totalCapital) / 1e18;
+        }
+
+        Strategy memory newStrategy = strategy({
+            strategyId: newId,
+            assets: _assets,
+            assetsPercentage: percentage,
+            deadline: investmentDeadline,
+            riskLimit: false,
+            assetAmount: assetAmountBps
+        });
+
+        pool.poolstrategy = newStrategy;  // Assign directly to pool
+        poolStrategies[_poolId] = newStrategy;  // Also store in mapping for easy access
+        idCount++;
+    }
+}
+
+contract Admin is investmentStrategy {
     //==================== ADMIN FUNCTIONS ====================
     function closePool(uint _poolId) 
         public 

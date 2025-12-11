@@ -5,6 +5,7 @@ lib/
 foundry.lock
 foundry.toml
 .github/
+.ImproveNote/
 
 # Ignores development broadcast logs
 !/broadcast
