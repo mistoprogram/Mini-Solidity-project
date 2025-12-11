@@ -14,12 +14,4 @@ contract mainMechanism is GetterFunction, getPrice{
         IERC20 token = IERC20(_tokenAddress);
         token.transfer(msg.sender, address(this), _amount);
     }
-
-    function interactToken(uint _poolId)
-    internal
-    onlyPoolOwner
-    validPoolId(_poolId)
-    {
-
-    }
 }
