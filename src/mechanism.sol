@@ -6,12 +6,21 @@ import "./src/price.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract mainMechanism is GetterFunction, getPrice{
-    function accessToken(uint _poolId, address _tokenAddress)
+    function accessToken(uint _poolId, address[] memory _tokenAddresses)
     internal
     onlyPoolOwner
     validPoolId(_poolId)
     {
-        IERC20 token = IERC20(_tokenAddress);
-        token.transfer(msg.sender, address(this), _amount);
+        Pool storage pool = pools[_poolId];
+        Strategy strat = pool.poolstrategy;
+
+        uint amount = strat.assetAmount;
+
+        for(uint i = 0; i < amount.length; i++) {
+            amount[i] = amount[i];
+        }
+
+        IERC20[] memory token = IERC20[](_tokenAddresses.length);
+        token.transfer(msg.sender, address(this)[i], _amount);
     }
 }

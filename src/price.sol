@@ -16,9 +16,13 @@ contract getPrice{
         int gld;
         int link;
         int usdc;
+        //addresses
+        address btcAddress;       
+        address ethAddress;       
+        address gldAddress;       
+        address linkAddress;       
+        address usdcAddress;       
     }
-
-    int public BTCPrice;
 
     constructor() {
         BTC = AggregatorV3Interface(0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43);

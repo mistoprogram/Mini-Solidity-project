@@ -225,7 +225,7 @@ contract investmentStrategy is PoolManagement{
     returns(uint)
     {
         for(uint i = 0; i < x.length; i++) {
-            x[i] = x[i] * 1e6;
+            x[i] = x[i] * 1e18;
         }
         return x;
     }
@@ -253,7 +253,7 @@ contract investmentStrategy is PoolManagement{
             assetAmountBps[i] = (percentage[i] * totalCapital) / 1e18;
         }
 
-        Strategy memory newStrategy = strategy({
+        Strategy memory newStrategy = Strategy({
             strategyId: newId,
             assets: _assets,
             assetsPercentage: percentage,
