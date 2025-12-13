@@ -29,8 +29,8 @@ contract GlobalVar {
     
     struct Strategy{
         uint strategyId;
-        uint[] assetsAmount;
-        uint[] assetsPercentage;
+        uint[] assetsAmount;       // amount (in wei) allocated to each asset
+        uint[] assetsPercentage;   // percentage of pool allocated to each asset, scaled by SCALE (1e18 == 100%)
         uint deadline;
         string[] assets;
         bool riskLimit;
@@ -40,7 +40,7 @@ contract GlobalVar {
         uint amount;
         int payoutAmount;
         uint timestamp;
-        uint ownershipPercent;
+        uint ownershipPercent; // scaled by SCALE (1e18 == 100%)
         bool hasWithdrawn;
         address investorAddress;
     }
@@ -72,6 +72,9 @@ contract GlobalVar {
     bool internal locked; // Reentrancy guard
     
     uint internal constant EMERGENCY_INACTIVE_PERIOD = 7 days; // Time before owner inactivity triggers emergency
+
+    // Standardized scale for percentages and external price feeds (Chainlink-style): 1e18 == 100%
+    uint internal constant SCALE = 1e18;
 
     //==================== MODIFIERS ====================
     modifier onlyPoolOwner(uint _poolId) {
@@ -149,7 +152,7 @@ contract PoolManagement is GlobalVar {
             totalProfit: 0,
             payoutAmount: 0,
             lastOwnerActivity: block.timestamp,
-            poolstrategy: Strategy({  // Add this
+            poolstrategy: Strategy({
                 strategyId: 0,
                 assetsAmount: new uint[](0),
                 assetsPercentage: new uint[](0),
@@ -189,15 +192,15 @@ contract PoolManagement is GlobalVar {
         // Update pool
         pool.amountRaised += _amount;
 
-        // Calculate ownership percentage (in basis points: 1% = 100)
-        uint ownershipBps = (_amount * 10000) / pool.amountRaised;
+        // Calculate ownership percentage using SCALE (1e18 == 100%)
+        uint ownershipScaled = (_amount * SCALE) / pool.amountRaised;
 
         // Create investor record
         Investor memory newInvestor = Investor({
             investorAddress: msg.sender,
             amount: _amount,
             timestamp: block.timestamp,
-            ownershipPercent: ownershipBps,
+            ownershipPercent: ownershipScaled,
             hasWithdrawn: false,
             payoutAmount: 0
         });
@@ -206,7 +209,15 @@ contract PoolManagement is GlobalVar {
         poolInvestors[_poolId].push(newInvestor);
         investorByAddress[_poolId][msg.sender] = newInvestor;
 
-        emit investmentMade(_poolId, msg.sender, _amount, ownershipBps);
+        emit investmentMade(_poolId, msg.sender, _amount, ownershipScaled);
+
+        // Recompute ownershipPercent for all investors (dilution) and keep mapping in sync
+        Investor[] storage investors = poolInvestors[_poolId];
+        for (uint i = 0; i < investors.length; i++) {
+            uint percent = (investors[i].amount * SCALE) / pool.amountRaised;
+            investors[i].ownershipPercent = percent;
+            investorByAddress[_poolId][investors[i].investorAddress] = investors[i];
+        }
 
         // Auto-close pool if target reached
         if (pool.amountRaised >= pool.targetAmount) {
@@ -220,46 +231,47 @@ contract investmentStrategy is PoolManagement{
 
     uint public idCount = 0;
 
-    function scaleUp(uint[] storage x)
-    internal
-    returns(uint)
-    {
-        for(uint i = 0; i < x.length; i++) {
-            x[i] = x[i] * 1e18;
-        }
-        return x;
-    }
-
-    function setStrategy(uint _poolId,
-    string[] memory _assets,
-    uint[] memory _percentages,
-    uint _deadline
+    // setStrategy now expects percentages scaled by SCALE (1e18 == 100%)
+    function setStrategy(
+        uint _poolId,
+        string[] memory _assets,
+        uint[] memory _percentages, // percentages scaled by SCALE (sum must be SCALE)
+        uint _deadline
     )
-    internal
+    public
     onlyPoolOwner(_poolId)
     nonReentrant
     {
+        require(_assets.length == _percentages.length, "Assets and percentages length mismatch");
+        require(_assets.length > 0, "At least one asset required");
+
         Pool storage pool = pools[_poolId];
+        require(pool.amountRaised > 0, "Pool has no funds to create strategy");
+
+        uint totalPercent = 0;
+        for (uint i = 0; i < _percentages.length; i++) {
+            totalPercent += _percentages[i];
+        }
+        require(totalPercent == SCALE, "Percentages must sum to SCALE (1e18 == 100%)");
+
         uint newId = idCount;
         uint64 investmentDeadline = uint64(block.timestamp + (_deadline * 86400));
-        Strategy storage strat = pool.poolstrategy;
-        uint[] storage percentage = strat.assetsPercentage;
-        uint[] storage assetAmountBps = strat.assetsAmount;
-        uint256 totalCapital = pool.amountRaised * 1e18;
 
-        scaleUp(percentage);
-        
-        for(uint i = 0; i < percentage.length; i++) {
-            assetAmountBps[i] = (percentage[i] * totalCapital) / 1e18;
+        uint[] memory assetAmount = new uint[](_percentages.length);
+
+        // Calculate each asset amount based on pool.amountRaised and scaled percentages
+        // assetAmount (wei) = amountRaised * percentage / SCALE
+        for (uint i = 0; i < _percentages.length; i++) {
+            assetAmount[i] = (pool.amountRaised * _percentages[i]) / SCALE;
         }
 
         Strategy memory newStrategy = Strategy({
             strategyId: newId,
             assets: _assets,
-            assetsPercentage: percentage,
+            assetsPercentage: _percentages,
             deadline: investmentDeadline,
             riskLimit: false,
-            assetAmount: assetAmountBps
+            assetsAmount: assetAmount
         });
 
         pool.poolstrategy = newStrategy;  // Assign directly to pool
@@ -330,14 +342,17 @@ contract Admin is investmentStrategy {
         
         // Loop through each investor
         for(uint i = 0; i < investors.length; i++) {
-            uint correctOwnershipPercent = (investors[i].amount * 10000) / totalRaised;
+            uint correctOwnershipPercent = (investors[i].amount * SCALE) / totalRaised;
             
-            int profitShare = (tProfit * int(correctOwnershipPercent)) / 10000;
+            int profitShare = (tProfit * int(correctOwnershipPercent)) / int(SCALE);
             int totalPayout = int(investors[i].amount) + profitShare;
             
-            // Update
+            // Update array entry
             investors[i].payoutAmount = totalPayout;
             investors[i].ownershipPercent = correctOwnershipPercent;
+
+            // Sync mapping entry so withdraw/emergencyWithdrawal see the updated values
+            investorByAddress[_poolId][investors[i].investorAddress] = investors[i];
         }
         
         emit returnDistributed(_poolId, tProfit);
@@ -366,6 +381,7 @@ contract Admin is investmentStrategy {
 
         int payout = investor.payoutAmount;
         
+        // mark withdrawn before external call (check-effects-interactions)
         investor.hasWithdrawn = true;
 
         (bool success, ) = payable(msg.sender).call{value: uint256(payout)}("");
