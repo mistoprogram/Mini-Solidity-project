@@ -1,1 +1,0 @@
-https://github.com/mistoprogram/Mini-Solidity-project/

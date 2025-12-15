@@ -34,6 +34,12 @@ contract GlobalVar {
         address[] tokenAddresses;
         bool riskLimit;
     }
+
+    struct SwapParam {
+        uint poolId;
+        uint slipTolerance;
+        uint deadline;
+    }
     
     struct Investor {
         uint amount;

@@ -54,4 +54,16 @@ contract mainMechanism is GetterFunction, assetsPrice {
         // Update owner activity timestamp
         pool.lastOwnerActivity = block.timestamp;
     }
+
+    function _setSwapParam(uint _poolId, uint _slipTolerance, uint _deadline) internal onlyPoolOwner(_poolId){
+        Pool storage pool = pools[_poolId];
+        uint maxSlip = _slipTolerance * SCALE;
+        uint deadline = uint64(block.timestamp + (_deadline * 86400));
+
+        SwapParam memory newParam = SwapParam({
+            poolId: _poolId,
+            slipTolerance: maxSlip,
+            deadline: deadline
+        });
+    }
 }
