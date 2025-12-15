@@ -6,64 +6,59 @@ import "./price.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract mainMechanism is GetterFunction, assetsPrice {
-    // SCALE is defined in GlobalVar as 1e18
-
-    /// @notice Transfers strategy tokens (held by this contract) to the pool owner.
-    /// @dev For each asset: compute tokenAmount = (assetWeiAllocated * SCALE) / tokenPrice
-    ///      where tokenPrice is returned by getPrice(tokenAddress) and scaled by SCALE (1e18).
-    ///      This yields token units scaled consistently with price feed = 1e18.
-    /// @param _poolId Id of the pool whose strategy tokens to transfer.
-    /// @param _tokenAddresses ERC20 token addresses corresponding to strategy assets (order must match strategy.assetsAmount)
-    function accessToken(uint _poolId, address[] memory _tokenAddresses)
-        internal
+        function setSwapParameters(
+        uint _poolId,
+        uint _slippageTolerance,    // e.g., 200 = 2%
+        uint _deadlineHours         // e.g., 24 = 24 hours from now
+    )
+        public
         onlyPoolOwner(_poolId)
         validPoolId(_poolId)
     {
         Pool storage pool = pools[_poolId];
-        Strategy storage strat = pool.poolstrategy;
-
-        uint len = strat.assetsAmount.length;
-        require(len > 0, "No strategy asset amounts defined");
-        require(_tokenAddresses.length == len, "Token addresses length must match strategy assets");
-
-        // Transfer each token amount to the pool owner (msg.sender is validated by onlyPoolOwner).
-        for (uint i = 0; i < len; i++) {
-            uint assetWei = strat.assetsAmount[i];
-            if (assetWei == 0) {
-                continue; // nothing allocated
-            }
-
-            // getPrice should return token price scaled by SCALE (1e18)
-            uint tokenPrice = getPrice(_tokenAddresses[i]);
-            require(tokenPrice > 0, "Invalid token price");
-
-    
-            // Therefore tokens = (assetWei / price) with proper SCALE adjustment:
-            uint tokensToSend = (assetWei * SCALE) / tokenPrice;
-
-            IERC20 token = IERC20(_tokenAddresses[i]);
-
-            // Ensure contract has the tokens (or this transfer will fail)
-            uint contractBal = token.balanceOf(address(this));
-            require(contractBal >= tokensToSend, "Contract doesn't hold enough tokens");
-
-            bool ok = token.transfer(msg.sender, tokensToSend);
-            require(ok, "Token transfer failed");
-        }
-
-        // Update owner activity timestamp
+        
+        require(pool.status == sts.closed, "Pool must be closed first");
+        require(_slippageTolerance > 0 && _slippageTolerance <= 1000, "Slippage must be 0.01% - 10%");
+        require(_deadlineHours > 0 && _deadlineHours <= 168, "Deadline must be 1h - 7 days");
+        
+        uint deadline = block.timestamp + (_deadlineHours * 1 hours);
+        
+        poolSwapParams[_poolId] = SwapParams({
+            slippageTolerance: _slippageTolerance,
+            executionDeadline: deadline,
+            maxPriceImpact: 500,  // Default 5% max impact
+            isSet: true
+        });
+        
         pool.lastOwnerActivity = block.timestamp;
+        
+        emit swapParametersSet(_poolId, _slippageTolerance, deadline);
     }
 
-    function _setSwapParam(uint _poolId, uint _slipTolerance, uint _deadline) internal onlyPoolOwner(_poolId){
+    function executeStrategy(uint _poolId) 
+    public 
+    onlyPoolOwner(_poolId) 
+    nonReentrant 
+    {
         Pool storage pool = pools[_poolId];
-        uint maxSlip = _slipTolerance * SCALE;
-        uint deadline = uint64(block.timestamp + (_deadline * 86400));
-
-        SwapParam memory newParam = SwapParam({
-            poolId: _poolId,
-            slipTolerance: maxSlip,
-            deadline: deadline
-        });
+        Strategy storage strat = pool.poolstrategy;
+        
+        require(pool.status == sts.closed, "Pool must be closed first");
+        require(strat.tokenAddresses.length > 0, "No strategy set");
+        
+        // Loop through each asset and swap ETH → tokens
+        for (uint i = 0; i < strat.tokenAddresses.length; i++) {
+            uint ethAmount = strat.assetsAmount[i];
+            address tokenAddress = strat.tokenAddresses[i];
+            
+            // Swap ETH for tokens via Uniswap
+            _swapETHForToken(ethAmount, tokenAddress);
+        }
+        
+        // Update pool status
+        pool.status = sts.investing;  // New status: "actively invested"
+        pool.lastOwnerActivity = block.timestamp;
+        
+        emit strategyExecuted(_poolId);
     }
 }

@@ -8,7 +8,8 @@ contract GlobalVar {
         closed,
         complete,
         stuck,
-        EmergencyWithdraw
+        EmergencyWithdraw,
+        investing
     }
 
     enum EmergencyType {
@@ -21,6 +22,8 @@ contract GlobalVar {
     event poolStatusChanged(uint indexed poolId, sts newStatus);
     event withdrawalMade(uint indexed poolId, address indexed investor, uint amount);
     event returnDistributed(uint indexed poolId, int totalProfit);
+    event strategyExecuted(uint poolId);
+    event swapParametersSet(uint poolId, uint slippageTolerance, uint deadline);
     
     // emergency events
     event emergencyWithdrawTriggered(uint indexed poolId, EmergencyType emergencyType);
@@ -35,10 +38,11 @@ contract GlobalVar {
         bool riskLimit;
     }
 
-    struct SwapParam {
-        uint poolId;
-        uint slipTolerance;
-        uint deadline;
+    struct SwapParams {
+        uint slippageTolerance;      // basis points (100 = 1%)
+        uint executionDeadline;      // timestamp
+        uint maxPriceImpact;         // basis points  
+        bool isSet;                  // has owner configured params?
     }
     
     struct Investor {
@@ -70,7 +74,7 @@ contract GlobalVar {
     mapping(uint => mapping(address => Investor)) internal investorByAddress;
     mapping(uint => bool) internal poolExists;
     mapping(uint => Strategy) internal poolStrategies;
-
+    mapping(uint => SwapParams) public poolSwapParams;
     uint public poolCount = 0;
     address public contractOwner;
     
