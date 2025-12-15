@@ -6,7 +6,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 contract assetsPrice{
     AggregatorV3Interface internal BTC;
     AggregatorV3Interface internal ETH;
-    AggregatorV3Interface internal GLD;
+    AggregatorV3Interface internal DAI;
     AggregatorV3Interface internal LINK;
     AggregatorV3Interface internal USDC;
 
@@ -63,7 +63,7 @@ contract assetsPrice{
     {
         p.btc = int256(_decimalPrice(BTC));
         p.eth = int256(_decimalPrice(ETH));
-        p.gld = int256(_decimalPrice(GLD));
+        p.dai = int256(_decimalPrice(DAI));
         p.link = int256(_decimalPrice(LINK));
         p.usdc = int256(_decimalPrice(USDC));
         
@@ -71,4 +71,10 @@ contract assetsPrice{
         p.btcAddress = address(BTC);
         p.ethAddress = address(ETH);
     }
+
+    function getPrice(address _tokenAddress) public returns(uint) {
+    AggregatorV3Interface feed = priceFeeds[_tokenAddress];
+    require(address(feed) != address(0), "Price feed not found");
+    return _decimalPrice(feed);
+}
 }

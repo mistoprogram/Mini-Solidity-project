@@ -218,14 +218,6 @@ contract PoolManagement is GlobalVar {
 
         emit investmentMade(_poolId, msg.sender, _amount, ownershipScaled);
 
-        // Recompute ownershipPercent for all investors (dilution) and keep mapping in sync
-        Investor[] storage investors = poolInvestors[_poolId];
-        for (uint i = 0; i < investors.length; i++) {
-            uint percent = (investors[i].amount * SCALE) / pool.amountRaised;
-            investors[i].ownershipPercent = percent;
-            investorByAddress[_poolId][investors[i].investorAddress] = investors[i];
-        }
-
         // Auto-close pool if target reached
         if (pool.amountRaised >= pool.targetAmount) {
             pool.status = sts.closed;
@@ -249,11 +241,10 @@ contract investmentStrategy is PoolManagement{
     onlyPoolOwner(_poolId)
     nonReentrant
     {
-        require(pool.amountRaised > 0, "Pool has no funds to create strategy");
-        require(_assets.length == _percentages.length, "Assets and percentages length mismatch");
-        require(_assets.length > 0, "At least one asset required");
-
         Pool storage pool = pools[_poolId];
+        require(pool.amountRaised > 0, "Pool has no funds to create strategy");
+        require(_tokenAddresses.length == _percentages.length, "Length mismatch");
+        require(_tokenAddresses.length > 0, "At least one asset required");
         require(pool.amountRaised > 0, "Pool has no funds to create strategy");
 
         uint totalPercent = 0;

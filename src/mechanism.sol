@@ -34,7 +34,7 @@ contract mainMechanism is GetterFunction, assetsPrice {
             }
 
             // getPrice should return token price scaled by SCALE (1e18)
-            uint tokenPrice = _decimalPrice(_tokenAddresses[i]);
+            uint tokenPrice = getPrice(_tokenAddresses[i]);
             require(tokenPrice > 0, "Invalid token price");
 
     
