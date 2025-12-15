@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED 
 pragma solidity ^0.8.20;
 
-import "./src/investment.sol";
-import "./src/price.sol";
+import "./investment.sol";
+import "./price.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract mainMechanism is GetterFunction, getPrice {
+contract mainMechanism is GetterFunction, assetsPrice {
     // SCALE is defined in GlobalVar as 1e18
 
     /// @notice Transfers strategy tokens (held by this contract) to the pool owner.
@@ -34,7 +34,7 @@ contract mainMechanism is GetterFunction, getPrice {
             }
 
             // getPrice should return token price scaled by SCALE (1e18)
-            uint tokenPrice = getPrice(_tokenAddresses[i]);
+            uint tokenPrice = _decimalPrice(_tokenAddresses[i]);
             require(tokenPrice > 0, "Invalid token price");
 
     

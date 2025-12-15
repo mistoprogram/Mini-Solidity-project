@@ -31,8 +31,7 @@ contract GlobalVar {
         uint strategyId;
         uint[] assetsAmount;       // amount (in wei) allocated to each asset
         uint[] assetsPercentage;   // percentage of pool allocated to each asset, scaled by SCALE (1e18 == 100%)
-        uint deadline;
-        string[] assets;
+        address[] tokenAddresses;
         bool riskLimit;
     }
     
@@ -209,6 +208,14 @@ contract PoolManagement is GlobalVar {
         poolInvestors[_poolId].push(newInvestor);
         investorByAddress[_poolId][msg.sender] = newInvestor;
 
+        // Now recalculate ALL ownership percentages (including the new investor)
+        Investor[] storage investors = poolInvestors[_poolId];
+        for (uint i = 0; i < investors.length; i++) {
+            uint percent = (investors[i].amount * SCALE) / pool.amountRaised;
+            investors[i].ownershipPercent = percent;
+            investorByAddress[_poolId][investors[i].investorAddress] = investors[i];
+        }
+
         emit investmentMade(_poolId, msg.sender, _amount, ownershipScaled);
 
         // Recompute ownershipPercent for all investors (dilution) and keep mapping in sync
@@ -234,7 +241,7 @@ contract investmentStrategy is PoolManagement{
     // setStrategy now expects percentages scaled by SCALE (1e18 == 100%)
     function setStrategy(
         uint _poolId,
-        string[] memory _assets,
+        address[] memory _tokenAddresses,
         uint[] memory _percentages, // percentages scaled by SCALE (sum must be SCALE)
         uint _deadline
     )
@@ -242,6 +249,7 @@ contract investmentStrategy is PoolManagement{
     onlyPoolOwner(_poolId)
     nonReentrant
     {
+        require(pool.amountRaised > 0, "Pool has no funds to create strategy");
         require(_assets.length == _percentages.length, "Assets and percentages length mismatch");
         require(_assets.length > 0, "At least one asset required");
 
@@ -255,7 +263,6 @@ contract investmentStrategy is PoolManagement{
         require(totalPercent == SCALE, "Percentages must sum to SCALE (1e18 == 100%)");
 
         uint newId = idCount;
-        uint64 investmentDeadline = uint64(block.timestamp + (_deadline * 86400));
 
         uint[] memory assetAmount = new uint[](_percentages.length);
 
@@ -269,7 +276,6 @@ contract investmentStrategy is PoolManagement{
             strategyId: newId,
             assets: _assets,
             assetsPercentage: _percentages,
-            deadline: investmentDeadline,
             riskLimit: false,
             assetsAmount: assetAmount
         });
